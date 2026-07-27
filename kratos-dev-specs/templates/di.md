@@ -1,78 +1,63 @@
-# DI 模板
+# Fx DI 模板
 
-模块根目录的 `di.go` 统一注册依赖、缓存、外部触发器和服务端接口。
+模块根目录的 `di.go` 只声明依赖图，导出 `Register() fx.Option`。资源创建、连接和停止由 provider 的 `fx.Lifecycle` hook 管理；HTTP/gRPC service 注册使用 `fx.Invoke`。模块不得调用 `app.Run()` 或 `app.Stop()`，Kratos 生命周期只由启动层唯一 bridge 管理。
 
 ```go
 package <module>
 
 import (
-    "<project>/module/<module>/domain"
-    "<project>/module/<module>/infras/repository"
-    "<project>/module/<module>/infras/repository/cache"
-    mq "<project>/module/<module>/interfaces/mq"
-    task "<project>/module/<module>/interfaces/task"
-    web "<project>/module/<module>/interfaces/web"
-    v1 "<proto-go-module>/api/<scope>/v1"
+	"context"
 
-    "github.com/go-kratos/kratos/v2/transport/grpc"
-    "github.com/go-kratos/kratos/v2/transport/http"
-    "go.uber.org/dig"
+	"<project>/module/<module>/domain"
+	"<project>/module/<module>/infras/repository"
+	"<project>/module/<module>/infras/repository/cache"
+	web "<project>/module/<module>/interfaces/web"
+	v1 "<project>-proto-go/api/<scope>/v1"
+
+	"github.com/go-kratos/kratos/v2/transport/grpc"
+	"github.com/go-kratos/kratos/v2/transport/http"
+	"go.uber.org/fx"
 )
 
-func Register(container *dig.Container) error {
-    err := container.Provide(cache.New<Module>Cache)
-    if err != nil {
-        return err
-    }
-
-    err = container.Provide(domain.New<Module>Factory)
-    if err != nil {
-        return err
-    }
-
-    err = container.Provide(
-        repository.New<Module>Repository,
-        dig.As(new(domain.<Module>Repository)),
-    )
-    if err != nil {
-        return err
-    }
-
-    err = container.Provide(domain.New<Module>Service)
-    if err != nil {
-        return err
-    }
-
-    err = container.Provide(web.New<Module>Controller)
-    if err != nil {
-        return err
-    }
-
-    err = container.Provide(mq.New<Module>Consumer)
-    if err != nil {
-        return err
-    }
-
-    err = container.Provide(task.New<Module>Job)
-    if err != nil {
-        return err
-    }
-
-    return container.Invoke(func(
-        gs *grpc.Server,
-        hs *http.Server,
-        ctrl *web.<Module>Controller,
-    ) {
-        v1.Register<Module>ServiceServer(gs, ctrl)
-        v1.Register<Module>ServiceHTTPServer(hs, ctrl)
-    })
+// Register 注册 <module> 模块依赖与服务
+func Register() fx.Option {
+	return fx.Module("<module>",
+		fx.Provide(
+			cache.New<Module>Cache,
+			domain.New<Module>Factory,
+			fx.Annotate(
+				repository.New<Module>Repository,
+				fx.As(new(domain.<Module>Repository)),
+			),
+			domain.New<Module>Service,
+			web.New<Module>Controller,
+		),
+		fx.Invoke(func(gs *grpc.Server, hs *http.Server, ctrl *web.<Module>Controller) {
+			v1.Register<Module>ServiceServer(gs, ctrl)
+			v1.Register<Module>ServiceHTTPServer(hs, ctrl)
+		}),
+	)
 }
 ```
 
-## 规则
+外部 client、consumer、poller 或长期运行总线的 provider 必须明确生命周期。构造阶段不启动后台工作；`OnStart` 连接/订阅，`OnStop` 取消、关闭并等待退出。把调用方传入的 `ctx` 继续传给 I/O，不能另造无取消的 context。
 
-- 注册顺序通常为 cache -> factory -> repository -> service -> controller/consumer/job -> gRPC/HTTP register。
-- repository 实现用 `dig.As(new(domain.<Module>Repository))` 绑定到 domain interface。
-- cache 先 provide，再注入 repository。
-- controller 注册 gRPC 和 HTTP service。
-- consumer/job 是否 provide 取决于模块是否需要对应外部触发器。
+```go
+func NewConsumer(lc fx.Lifecycle, client *Client) *Consumer {
+	consumer := &Consumer{client: client}
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			return consumer.Start(ctx)
+		},
+		OnStop: func(ctx context.Context) error {
+			return consumer.Stop(ctx)
+		},
+	})
+	return consumer
+}
+```
+
+- 使用 `fx.Options` 组合模块；使用 `fx.Annotate` + `fx.As` 将实现绑定到 consumer-side domain interface。
+- 只有 common constructor 的 `fx.In` 实际声明 group 时才用 `fx.Out` 输出分组结果；HTTP/gRPC option tag 见 [server-options.md](server-options.md)。
+- provider 的返回错误应保留创建资源的上下文；不要在构造器外创建全局 DB、client 或 goroutine。
+- provider 依赖顺序由 Fx 图决定，不依赖 `fx.Provide` 的书写顺序。

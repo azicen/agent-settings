@@ -1,6 +1,6 @@
 # Controller 模板
 
-Controller 位于 `module/<module>/interfaces/web`，负责 HTTP/gRPC/proto service 适配。
+Controller 位于 `module/<module>/interfaces/web`，仅做 proto 请求校验/转换和 domain 调用。HTTP 成功/失败编码由 common server 的统一 `ResponseEncoder` / `ErrorEncoder` 完成；业务错误只能使用 proto SDK helper。
 
 ```go
 package web
@@ -66,7 +66,7 @@ func (c *<Module>Controller) Delete<Module>(ctx context.Context, req *v1.Delete<
 }
 ```
 
-## 规则
+规则：
 
 - import 默认不为本模块包添加别名；只有引入多个同名包、多个模块 domain、公共包 domain，或存在 Go 语法冲突时，才使用 `<module>Domain`、`commonDomain` 等别名。
 - 嵌入 `v1.Unimplemented<Service>Server`。

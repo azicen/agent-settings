@@ -1,58 +1,54 @@
-# Proto 和 error-proto 协作模板
+# Proto 和业务错误模板
 
-## API proto
+先从源 proto 仓库发现 `buf.yaml`、`buf.gen.yaml` 与 CI；当前设计使用 **buf v2** 配置：`buf.yaml` 的 `version: v2` 定义 `modules`、`deps`、`lint` 和 `breaking`，`buf.gen.yaml` 的 `version: v2` 定义本地生成插件。不要把 v1 工作区、旧版模板或猜测的生成参数复制进项目。
 
-API 定义一般在执行项目根目录上一级的某个 `-proto` 后缀目录，例如：
+外部 API 和 error proto 只能在源 proto 仓库维护。源仓执行并在 CI 执行：
 
-```text
-../package-proto
+```sh
+buf lint
+buf generate
 ```
 
-常见结构：
+生成的 SDK 由 CI 同步到 `<project>-proto-go`；业务仓更新发布的 SDK 依赖后编译验证。业务仓**只能**生成自身 `pkg/config` 的配置 proto，不能在本仓生成或修改外部 API、错误 proto 或 SDK。目标仓的实际 CI workflow、发布分支及同步路径必须从仓库文件发现。
 
-```text
-api/<scope>/v1/<module>.proto
-api/<scope>/v1/<module>_error_reason.proto
-errors/errors.proto
-```
+## RPC 模板
 
-业务项目引用编译后的 proto SDK，通常已在 `go.mod` 中引入，模块名一般以 `-proto-go` 结尾，例如：
+每个 RPC 必须显式声明 `required_permission`、`authenticated` 或 `public` 之一；同时存在时按 `required_permission` > `authenticated` > `public` 解析。导入实际 authz proto，并使用其完整限定扩展名。不要规定 `auth.enabled` 的开关含义。
 
-```text
-github.com/namespace/package-proto-go
-```
+```proto
+syntax = "proto3";
 
-## 查找和记录流程
+package api.<scope>.<module>.v1;
 
-1. 需要查看 API 定义时，先在执行项目根目录的上一级目录查找 `*-proto`。
-2. 如果找不到或不确定 proto 项目目录，询问用户。
-3. 即使找到了疑似 proto 项目，也要询问用户确认。
-4. 用户确认后，在执行项目根目录下创建或更新 `.agents/package.local.json`，使用字段 `proto` 记录 proto 项目目录。
-5. 检查业务项目 `go.mod` 是否引入了模块名后缀为 `-proto-go` 的 proto SDK。
-6. 如果没有发现 proto SDK，询问用户对应的 proto SDK Go 模块。
-7. 用户确认后，在 `.agents/package.local.json` 中使用字段 `sdk.go` 记录 proto SDK Go 模块。
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "validate/validate.proto";
+import "api/common/v1/authz.proto";
 
-`.agents/package.local.json` 示例：
+option go_package = "<project>-proto-go/api/<scope>/v1;v1";
 
-```json
-{
-  "proto": "/home/username/project/package-proto",
-  "sdk.go": "github.com/namespace/package-proto-go"
+service <Module>Service {
+  rpc Get<Module>(Get<Module>Request) returns (<Module>Info) {
+    option (api.common.authz.v1.required_permission) = "<module>:read";
+    option (google.api.http) = {
+      get: "/api/v1/<modules>/{<module>_id}"
+    };
+  }
+}
+
+message Get<Module>Request {
+  int64 <module>_id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (validate.rules).int64.gt = 0
+  ];
 }
 ```
 
-优先沿用项目已有 `.agents/package.local.json` 的结构；如果文件不存在，使用扁平 key 结构。
+HTTP API 复用 `google/api/annotations.proto` 的 `google.api.http`，必填字段复用 `google/api/field_behavior.proto`，输入约束复用 `validate/validate.proto`。只在协议语义需要时添加字段约束，避免以业务代码取代可声明的协议校验。
 
-## 修改和更新流程
+## Error reason 完整模板
 
-1. 不要在业务项目中构建 proto 文件。
-2. 需要修改 proto 时，先获得用户修改权限。
-3. 修改 proto 后通知用户提交 proto 仓库，CI/CD 会自动构建。
-4. 用户确认 CI/CD 完成后，在业务项目运行 `go get <proto-go-module>@latest` 或指定版本。
-
-## error-proto
-
-业务错误必须优先使用 error-proto 定义并生成的 helper。
+每个 error reason 文件包含 `syntax`、`package`、`errors` import、`go_package`、enum 默认 code，并给**每一个** enum value 指定 `(errors.code)`：
 
 ```proto
 syntax = "proto3";
@@ -61,27 +57,16 @@ package api.<scope>.<module>.v1;
 
 import "errors/errors.proto";
 
-option go_package = "<proto-go-module>/api/<scope>/v1;v1";
+option go_package = "<project>-proto-go/api/<scope>/v1;v1";
 
 enum <Module>ErrorReason {
   option (errors.default_code) = 500;
 
   <MODULE>_UNSPECIFIED = 0 [(errors.code) = 500];
   <MODULE>_NOT_FOUND = 1 [(errors.code) = 404];
-  <MODULE>_DUPLICATE_CODE = 2 [(errors.code) = 409];
+  <MODULE>_DUPLICATE = 2 [(errors.code) = 409];
   <MODULE>_INVALID_ARGUMENT = 3 [(errors.code) = 400];
 }
 ```
 
-业务代码使用生成 helper：
-
-```go
-return nil, v1.Error<Module>NotFound("资源不存在")
-```
-
-## 规则
-
-- 不绕过 error-proto 手写业务错误。
-- 新增错误 reason 时设置 `(errors.code)`。
-- 修改 error-proto 后同样等待 CI/CD 生成，再 `go get` 更新业务项目依赖。
-- 找到疑似 proto 项目也要先询问用户确认，再记录到 `.agents/package.local.json`。
+业务代码仅调用已发布 SDK 生成的 helper，例如 `v1.Error<Module>NotFound("资源不存在")`；不得手写业务错误或绕过 error proto。修改源 proto 后等待 SDK 同步 CI 完成，再更新业务依赖并编译。

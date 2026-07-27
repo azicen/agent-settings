@@ -1,51 +1,52 @@
 # SQL mapper/DTO 模板
 
-复杂 SQL 不再默认使用独立 DTO 目录，也不要在 repository 实现中手写 SQL。优先在 `module/<module>/infras/repository/db/mapper` 中定义 SQL 入参/结果 DTO、mapper interface 和注释 SQL，再通过 `mage gorm` 生成 `db/sqlquery`。
+复杂 SQL 在 `infras/repository/db/mapper` 声明 DTO、mapper interface 和注释 SQL，再由项目实际生成命令生成 `db/sqlquery`。repository 不写 `Raw` SQL，生成物不可手改。
 
 ```go
 package mapper
 
 import (
-    "context"
+	"context"
 
-    "gorm.io/cli/gorm/genconfig"
+	"gorm.io/cli/gorm/genconfig"
 )
 
 var _ = genconfig.Config{
-    IncludeInterfaces: []any{"<Module>Mapper"},
-    ExcludeStructs:    []any{"*"},
+	IncludeInterfaces: []any{"<Module>Mapper"},
+	ExcludeStructs:    []any{"*"},
 }
 
+// <Module>SearchDTO 描述搜索条件。
 type <Module>SearchDTO struct {
-    IDs    []int64
-    Name   string
-    Limit  int
-    Offset int
+	IDs    []int64
+	Limit  int
+	Offset int
 }
 
 type <Module>Mapper[T any] interface {
-    /*
-        SELECT id, name
-        FROM <table_name>
-        WHERE deleted = 0
-          {{if len(search.IDs) > 0}}
-          AND id IN @search.IDs
-          {{end}}
-          {{if search.Name != ""}}
-          AND name LIKE CONCAT('%', @search.Name, '%')
-          {{end}}
-        ORDER BY id DESC
-        LIMIT @search.Limit
-        OFFSET @search.Offset
-    */
-    Search<Module>(ctx context.Context, search <Module>SearchDTO) ([]T, error)
+	/*
+		SELECT id, code, name
+		FROM <table_name>
+		WHERE deleted = 0 AND id IN @search.IDs
+		LIMIT @search.Limit OFFSET @search.Offset
+	*/
+	Search<Module>(ctx context.Context, search <Module>SearchDTO) ([]T, error)
 }
 ```
 
-## 规则
+```go
+rows, err := sqlquery.<Module>Mapper[*model.<Module>](tx.GetTx(ctx, r.db)).
+	Search<Module>(ctx, mapper.<Module>SearchDTO{
+		IDs:    search.IDs,
+		Limit:  int(page.PageSize),
+		Offset: int((page.Page - 1) * page.PageSize),
+	})
+if err != nil {
+	return pagination.PageResponse[*domain.<Module>]{}, err
+}
+```
 
-- SQL 入参和 SQL 结果映射需要额外结构体时，统一使用 `DTO` 后缀命名，例如 `<Module>SearchDTO`、`<Module>StatisticsDTO`。
-- mapper interface 使用 `type <Module>Mapper[T any] interface { ... }`。
-- 生成代码放在 `db/sqlquery`，不要手改。
-- repository 实现通过 `sqlquery.<Module>Mapper[*model.<Model>](tx.GetTx(ctx, r.db))` 调用生成方法，确保外层 `tx.Transaction` 可被复用。
-- 返回 domain 层前，转换为 domain entity、value object 或 repository method 约定的返回类型。
+
+- SQL 入参和结果映射结构统一使用 `DTO` 后缀；mapper 泛型签名、生成命令与 package 名称以项目已有代码为准。
+- 每次调用从 `tx.GetTx(ctx, r.db)` 构造生成 mapper，确保 `tx.Transaction` 内的查询复用事务。
+- 将 model/DTO 转成 domain entity 后再返回；不要让生成类型穿透到 domain。
