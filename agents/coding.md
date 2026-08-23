@@ -1,8 +1,8 @@
 ---
 description: 边界明确的实现专家。在范围清晰的任务中做出最小且正确的改动，保留无关工作，并进行聚焦验证。
 mode: subagent
-model: newapi/glm-5.2
-variant: max
+model: newapi/gpt-5.6-terra
+variant: medium
 hidden: true
 temperature: 0.1
 permission:

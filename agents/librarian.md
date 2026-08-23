@@ -2,7 +2,7 @@
 description: 只读的外部文档与库研究。用于官方 API 文档、特定版本行为、GitHub 示例和最新依赖指导。
 mode: subagent
 model: newapi/gemini-3.7-flash
-variant: max
+variant: high
 hidden: true
 temperature: 0.1
 permission:
