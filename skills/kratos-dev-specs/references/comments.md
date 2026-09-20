@@ -10,14 +10,14 @@
 //   - id: 设备 ID
 //
 // return:
-//   - result: 设备实体，未命中时为 optional.None
+//   - 设备实体，未命中时为 optional.None
 func (r *EquipmentRepository) FindByID(ctx context.Context, id int64) (optional.Option[*domain.Equipment], error) {
 	// ...
 }
 ```
 
 ```go
-// 计算缓存未命中的 ID，只为缺失数据执行数据库查询。
+// 计算缓存未命中的 ID，只为缺失数据执行数据库查询
 missingIDs := make([]int64, 0, len(ids))
 for _, id := range ids {
 	if _, ok := cached[id]; !ok {
@@ -47,7 +47,7 @@ for _, id := range ids {
 错误示例：不要在 `struct` 顶层注释中罗列构造参数。顶层 Go doc 的职责是说明类型本身，构造依赖属于构造函数的注释；把参数清单放在这里既不能解释字段约束，也会在构造函数变化时留下过期信息。
 
 ```go
-// ModbusTCPReadAccessSyncScheduler 创建时需要 syncFacade、settings 和 requests。
+// ModbusTCPReadAccessSyncScheduler 创建时需要 syncFacade、settings 和 requests
 type ModbusTCPReadAccessSyncScheduler struct {
 	// ...
 }
@@ -56,17 +56,17 @@ type ModbusTCPReadAccessSyncScheduler struct {
 正确示例：以下仅演示字段注释的粒度。字段集合、channel 缓冲、写入方、关闭方和状态所有权必须按具体实现设计，不得机械复制。
 
 ```go
-// Record 表示可持久化或跨层传递的通用业务记录。
+// Record 表示可持久化或跨层传递的通用业务记录
 type Record struct {
-	// ID 记录唯一标识。
+	// ID 记录唯一标识
 	ID int64
-	// Name 记录名称。
+	// Name 记录名称
 	Name string
-	// Description 记录描述，可为空。
+	// Description 记录描述，可为空
 	Description optional.Option[string]
-	// Metadata 附加属性；键和值的业务语义由所属模块定义。
+	// Metadata 附加属性；键和值的业务语义由所属模块定义
 	Metadata map[string]string
-	// CreatedAt 创建时间。
+	// CreatedAt 创建时间
 	CreatedAt time.Time
 }
 ```
@@ -74,19 +74,19 @@ type Record struct {
 正确示例：以下仅演示并发对象字段的职责、所有权和同步语义；具体调度策略由实现定义。
 
 ```go
-// TaskDispatcher 协调后台任务请求及其停止过程；具体调度策略由实现定义。
+// TaskDispatcher 协调后台任务请求及其停止过程；具体调度策略由实现定义
 type TaskDispatcher struct {
-	// executor 执行单个任务，不由 dispatcher 创建或关闭。
+	// executor 执行单个任务，不由 dispatcher 创建或关闭
 	executor TaskExecutor
-	// settings 提供调度配置，仅由 worker goroutine 读取。
+	// settings 提供调度配置，仅由 worker goroutine 读取
 	settings DispatchSettings
-	// requests 是任务请求通道；缓冲容量、写入方、读取方和关闭策略必须与具体实现一致。
+	// requests 是任务请求通道；缓冲容量、写入方、读取方和关闭策略必须与具体实现一致
 	requests chan context.Context
-	// stop 是停止信号通道；Stop 通过 stopOnce 关闭，通知 worker 退出。
+	// stop 是停止信号通道；Stop 通过 stopOnce 关闭，通知 worker 退出
 	stop chan struct{}
-	// done 由 worker 退出时关闭；Stop 等待该通道确认退出完成。
+	// done 由 worker 退出时关闭；Stop 等待该通道确认退出完成
 	done chan struct{}
-	// stopOnce 确保 stop 仅关闭一次。
+	// stopOnce 确保 stop 仅关闭一次
 	stopOnce sync.Once
 }
 ```

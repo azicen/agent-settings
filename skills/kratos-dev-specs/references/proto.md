@@ -9,11 +9,11 @@ buf lint
 buf generate
 ```
 
-生成的 SDK 由 CI 同步到 `<project>-proto-go`；业务仓更新发布的 SDK 依赖后编译验证。业务仓**只能**生成自身 `pkg/config` 的配置 proto，不能在本仓生成或修改外部 API、错误 proto 或 SDK。目标仓的实际 CI workflow、发布分支及同步路径必须从仓库文件发现。
+生成的 SDK 由 CI 同步到 `<project>-proto-go`；业务仓更新发布的 SDK 依赖后编译验证。业务仓**只能**生成自身 `pkg/config` 的配置 proto（通常通过 `mage config` 生成），不能在本仓生成或修改外部 API、错误 proto 或 SDK。目标仓的实际 CI workflow、发布分支及同步路径必须从仓库文件发现。
 
-## RPC 模板
+## RPC 模板与声明式鉴权
 
-每个 RPC 必须显式声明 `required_permission`、`authenticated` 或 `public` 之一；同时存在时按 `required_permission` > `authenticated` > `public` 解析。导入实际 authz proto，并使用其完整限定扩展名。不要规定 `auth.enabled` 的开关含义。
+每个 RPC 必须显式声明 `required_permission`、`authenticated` 或 `public` 之一；同时存在时按 `required_permission` > `authenticated` > `public` 解析。导入实际 authz proto，并使用其完整限定扩展名。公共鉴权中间件在启动期利用 `protoregistry.GlobalFiles` 扫描已注册的描述符，构建 $O(1)$ 查找的授权索引，自动进行权限判定。
 
 ```proto
 syntax = "proto3";
@@ -69,4 +69,4 @@ enum <Module>ErrorReason {
 }
 ```
 
-业务代码仅调用已发布 SDK 生成的 helper，例如 `v1.Error<Module>NotFound("资源不存在")`；不得手写业务错误或绕过 error proto。修改源 proto 后等待 SDK 同步 CI 完成，再更新业务依赖并编译。
+在 Kratos v3 中，生成的代码基于 `github.com/go-kratos/kratos/v3/errors`。业务代码仅调用已发布 SDK 生成的 helper 函数，例如 `v1.Error<Module>NotFound("资源不存在")` 或 `v1.Is<Module>NotFound(err)`；不得手写裸字符串业务错误或绕过 error proto。修改源 proto 后等待 SDK 同步 CI 完成，再更新业务依赖并编译。

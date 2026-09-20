@@ -13,15 +13,15 @@ import (
 	"<project>-common/pkg/optional"
 )
 
-// <Module>Repository 定义 <module> 的持久化能力。
+// <Module>Repository 定义 <module> 的持久化能力
 type <Module>Repository interface {
-	// FindByID 根据 ID 查询 <module>。
+	// FindByID 根据 ID 查询 <module>
 	//
 	// param:
 	//   - id: <module> ID
 	//
 	// return:
-	//   - result: 实体，未命中时为 optional.None
+	//   - 实体，未命中时为 optional.None
 	FindByID(ctx context.Context, id int64) (optional.Option[*<Module>], error)
 }
 ```
@@ -31,7 +31,7 @@ func (r *<Module>Repository) FindByIDs(ctx context.Context, ids []int64) (map[in
 	if len(ids) == 0 {
 		return map[int64]*domain.<Module>{}, nil
 	}
-	// 查询并填充非 nil map。
+	// 查询并填充非 nil map
 	return result, nil
 }
 ```
@@ -55,13 +55,13 @@ func (r *<Module>Repository) FindByIDs(ctx context.Context, ids []int64) (map[in
 - 组合：`Zip`、`ZipWith`、`Unzip`、`UnzipWith`。
 
 ```go
-// 未命中使用 None；非基本业务对象通常以指针作为 Option 的元素类型。
+// 未命中使用 None；非基本业务对象通常以指针作为 Option 的元素类型
 entity := optional.PtrFromNillable(entityPtr)
 name := optional.MapOr(entity, "", func(value *domain.<Module>) string {
 	return value.Name
 })
 
-// mapper 自身返回 Option 时使用 FlatMap，避免 Option[Option[T]]。
+// mapper 自身返回 Option 时使用 FlatMap，避免 Option[Option[T]]
 parent := optional.FlatMap(entity, func(value *domain.<Module>) optional.Option[*domain.<Module>] {
 	return value.Parent()
 })

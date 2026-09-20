@@ -47,7 +47,7 @@ func newLocalCache() jetcache.Cache {
 //   - id: <模块>ID
 //
 // return:
-//   - result: 命中返回 Some，未命中返回 None
+//   - 命中返回 Some，未命中返回 None
 func (c *<Module>Cache) Get(ctx context.Context, id int64) (optional.Option[*domain.<Module>], error) {
 	result, err := c.cache.MGetWithErr(ctx, cachePrefix, []int64{id}, nil)
 	if err != nil {
@@ -64,20 +64,20 @@ func (c *<Module>Cache) Get(ctx context.Context, id int64) (optional.Option[*dom
 //   - ids: <模块>ID列表
 //
 // return:
-//   - result: 命中项映射，所有路径返回非 nil 容器
+//   - 命中项映射，所有路径返回非 nil 容器
 func (c *<Module>Cache) GetAll(ctx context.Context, ids []int64) (map[int64]*domain.<Module>, error) {
-    result, err := c.cache.MGetWithErr(ctx, cacheKey, ids, nil)
-    if err != nil {
-        return make(map[int64]*domain.<Module>), err
-    }
+	result, err := c.cache.MGetWithErr(ctx, cachePrefix, ids, nil)
+	if err != nil {
+		return make(map[int64]*domain.<Module>), err
+	}
 
-    entities := make(map[int64]*domain.<Module>, len(result))
-    for id, entity := range result {
-        if entity != nil {
-            entities[id] = entity
-        }
-    }
-    return entities, nil
+	entities := make(map[int64]*domain.<Module>, len(result))
+	for id, entity := range result {
+		if entity != nil {
+			entities[id] = entity
+		}
+	}
+	return entities, nil
 }
 
 // Put 将<模块>实体写入缓存
