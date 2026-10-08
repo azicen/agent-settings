@@ -1,6 +1,6 @@
 ---
 name: uber-go-guide
-description: Uber Go Guide 中文规范。Use when writing, reviewing, or refactoring Go code to apply Uber Go style guidelines, Go error handling, concurrency, performance, naming, imports, tests, and lint rules.
+description: "用于 Go 编码、审查与重构，遵循 Uber Go 规范；覆盖错误处理、并发、性能、命名、导入与测试。"
 ---
 
 # Uber Go Guide 中文规范

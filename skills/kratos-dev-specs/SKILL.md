@@ -1,6 +1,6 @@
 ---
 name: kratos-dev-specs
-description: "用于 Go Kratos 项目的需求开发、模块新增、领域建模、Repository、HTTP/gRPC、Proto、Fx 依赖注入、启动配置、日志、容器、重构、排障与代码审查。只要确认当前项目使用 Kratos，就必须加载本技能并按任务路由读取对应规范。"
+description: "用于 Go Kratos 项目的开发、重构、排障与审查；覆盖领域建模、接口、持久化、依赖注入与运行配置。"
 ---
 
 # Golang Kratos 项目规范

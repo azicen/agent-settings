@@ -1,6 +1,6 @@
 ---
 name: web-search-standards
-description: Use when performing web search, MCP search, Tavily/Jina search, 网络搜索, 查资料, fact checking, finding latest information, or citing external sources.
+description: "用于联网与 MCP 搜索、查资料和事实核查；优先权威来源、英文技术查询与交叉验证，注明来源及不确定性。"
 ---
 
 # 网络搜索规范
